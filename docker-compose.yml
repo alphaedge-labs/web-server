@@ -41,11 +41,11 @@ services:
         deploy:
             resources:
                 limits:
-                    cpus: "2"
-                    memory: 512M
+                    cpus: "0.5" # Use half of the available CPU
+                    memory: 256M # Limit memory to 256 MB
                 reservations:
-                    cpus: "1"
-                    memory: 256M
+                    cpus: "0.25" # Reserve 25% of the available CPU
+                    memory: 128M # Reserve 128 MB memory
 
     alphaedge__redis:
         image: redis:latest
@@ -67,11 +67,11 @@ services:
         deploy:
             resources:
                 limits:
-                    cpus: "1"
-                    memory: 256M
+                    cpus: "0.25" # Use 25% of the available CPU
+                    memory: 128M # Limit memory to 128 MB
                 reservations:
-                    cpus: "0.5"
-                    memory: 128M
+                    cpus: "0.1" # Reserve 10% of the available CPU
+                    memory: 64M # Reserve 64 MB memory
 
 networks:
     alphaedge__network:
