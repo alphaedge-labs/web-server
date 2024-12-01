@@ -1,104 +1,79 @@
-version: '3.8'
 services:
-  fastapi:
-    build:
-      context: ./
-      dockerfile: ./Dockerfile
-    container_name: alphaedge_fastapi
-    env_file:
-      - ./.env
-    ports:
-      - '${PORT}:${PORT}'
-    environment:
-      - HOST=$HOST
-      - PORT=$PORT
-      - REDIS_HOST=$REDIS_HOST
-      - REDIS_PORT=$REDIS_PORT
-      - REDIS_PASS=$REDIS_PASS
-      - RABBITMQ_HOST=$RABBITMQ_HOST
-      - RABBITMQ_USER=$RABBITMQ_USER
-      - RABBITMQ_PASS=$RABBITMQ_PASS
-    volumes:
-      - ./src:/app
-    depends_on:
-      - rabbitmq
-      - redis
-      - sqlite
-    restart: always
-    networks:
-      - app_network
+    alphaedge__fastapi:
+        image: alphaedge__fastapi:latest
+        build:
+            context: ./
+            dockerfile: ./Dockerfile
+        container_name: alphaedge__fastapi
+        restart: always
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:${PORT}/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        depends_on:
+            alphaedge__redis:
+                condition: service_healthy
+        env_file:
+            - ./.env
+        ports:
+            - "${PORT}:${PORT}"
+        environment:
+            - HOST=$HOST
+            - PORT=$PORT
+            - REDIS_HOST=$REDIS_HOST
+            - REDIS_PORT=$REDIS_PORT
+            - REDIS_PASSWORD=$REDIS_PASSWORD
+            - RABBITMQ_HOST=$RABBITMQ_HOST
+            - RABBITMQ_USER=$RABBITMQ_USER
+            - RABBITMQ_PASS=$RABBITMQ_PASS
+        volumes:
+            - .:/app
+            - ./logs:/app/logs
+        networks:
+            - alphaedge__network
+        deploy:
+            resources:
+                limits:
+                    cpus: "2"
+                    memory: 512M
+                reservations:
+                    cpus: "1"
+                    memory: 256M
 
-  redis:
-    build:
-      context: .
-      dockerfile: ./redis/Dockerfile
-    container_name: alphaedge_redis
-    env_file:
-      - ./redis/.env
-    volumes:
-      - redis_data:/data
-    ports:
-      - '6379:${REDIS_PORT}'
-    environment:
-      - REDIS_PASS=${REDIS_PASS}
-      - REDIS_HOST=${REDIS_HOST}
-    restart: unless-stopped
-    networks:
-      - app_network
-
-  rabbitmq:
-    build:
-      context: .
-      dockerfile: ./rabbitmq/Dockerfile
-    container_name: alphaedge_rabbitmq
-    env_file:
-      - ./rabbitmq/.env
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    ports:
-      - '5672:5672'
-      - '15672:15672'
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
-    restart: unless-stopped
-    networks:
-      - app_network
-
-  workers:
-    build:
-      context: .
-      dockerfile: ./workers/Dockerfile
-    container_name: alphaedge_workers
-    env_file:
-      - ./workers/.env
-    depends_on:
-      - rabbitmq
-      - fastapi
-    environment:
-      - RABBITMQ_HOST=${RABBITMQ_HOST}
-      - RABBITMQ_USER=${RABBITMQ_USER}
-      - RABBITMQ_PASS=${RABBITMQ_PASS}
-      - HOST=$HOST
-      - PORT=$PORT
-    networks:
-      - app_network
-
-  sqlite:
-    build: ./sqlite
-    container_name: alphaedge_sqlite
-    volumes:
-      - sqlite_data:/app/data
-    restart: unless-stopped
+    alphaedge__redis:
+        image: redis:latest
+        container_name: alphaedge__redis
+        command: redis-server --requirepass ${REDIS_PASSWORD}
+        ports:
+            - "${REDIS_PORT}:6379"
+        environment:
+            - REDIS_PASSWORD=${REDIS_PASSWORD}
+        healthcheck:
+            test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
+        restart: always
+        networks:
+            - alphaedge__network
+        deploy:
+            resources:
+                limits:
+                    cpus: "1"
+                    memory: 256M
+                reservations:
+                    cpus: "0.5"
+                    memory: 128M
 
 networks:
-  app_network:
-    driver: bridge
-
-volumes:
-  redis_data:
-    driver: local
-  rabbitmq_data:
-    driver: local
-  sqlite_data:
-    driver: local
+    alphaedge__network:
+        driver: bridge
+        external: true

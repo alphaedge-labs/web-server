@@ -1,5 +1,0 @@
-# .gitignore for SQLite
-.env
-*.log
-*.pid
-data/

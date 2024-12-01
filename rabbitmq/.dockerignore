@@ -1,5 +1,0 @@
-# .dockerignore for RabbitMQ
-.env
-.git
-*.log
-*.pid

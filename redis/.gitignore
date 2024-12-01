@@ -1,4 +1,0 @@
-# .gitignore for Redis
-.env
-*.log
-*.pid

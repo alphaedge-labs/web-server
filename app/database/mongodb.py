@@ -1,22 +1,19 @@
 from time import sleep
-import logging
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from app.config import (
+    MONGO_CONNECTION_STRING,
+    MONGO_DB_NAME
+)
+from loguru import logger
 
-from ..config import env
-
-logging.basicConfig(level=logging.INFO)
-mongo_logger = logging.getLogger(__name__)
-
-mongo_connection_string = env.MONGO_CONNECTION_STRING
-mongo_db_name = env.MONGO_DB_NAME
-
+mongo_logger = logger.bind(name="MongoDB")
 
 class MongoDBClient:
     def __init__(self, db_name, max_retries=20):
         self.db_name = db_name
         self.max_retries = max_retries
-        self.client = MongoClient(mongo_connection_string)
+        self.client = MongoClient(MONGO_CONNECTION_STRING)
         self._connect()
 
     def _connect(self):
@@ -35,14 +32,5 @@ class MongoDBClient:
     def get_database(self):
         return self.client[self.db_name]
 
-
-mongo_client = MongoDBClient(db_name=mongo_db_name)
+mongo_client = MongoDBClient(db_name=MONGO_DB_NAME)
 db = mongo_client.get_database()
-
-
-class Store:
-    def __init__(self, db):
-        self.db = db
-
-
-store = Store(db=db)

@@ -1,4 +1,0 @@
-# .gitignore for RabbitMQ
-.env
-*.log
-*.pid
