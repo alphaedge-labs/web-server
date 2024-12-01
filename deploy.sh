@@ -1,31 +1,33 @@
 #!/bin/bash
 
-echo "🚀 Starting the build process..."
-docker compose build
+API_PROFILE="web-service"
+
+echo "🚀 Starting the build process for profile: $API_PROFILE..."
+docker compose --profile $API_PROFILE build
 if [ $? -eq 0 ]; then
-  echo "✅ Build completed successfully!"
+  echo "✅ Build completed successfully for profile: $API_PROFILE!"
 else
-  echo "❌ Build failed. Please check the errors above. 💔"
+  echo "❌ Build failed for profile: $API_PROFILE. Please check the errors above. 💔"
   exit 1
 fi
 
-echo "🛑 Shutting down any running containers..."
-docker compose down
+echo "🛑 Shutting down any running containers for profile: $API_PROFILE..."
+docker compose --profile $API_PROFILE down
 if [ $? -eq 0 ]; then
-  echo "✅ Containers stopped successfully! 🧹"
+  echo "✅ Containers stopped successfully for profile: $API_PROFILE! 🧹"
 else
-  echo "❌ Failed to stop containers. Please check for issues. 😢"
+  echo "❌ Failed to stop containers for profile: $API_PROFILE. Please check for issues. 😢"
   exit 1
 fi
 
-echo "🔧 Starting up containers in detached mode..."
-docker compose up -d
+echo "🔧 Starting up containers in detached mode for profile: $API_PROFILE..."
+docker compose --profile $API_PROFILE up -d
 if [ $? -eq 0 ]; then
-  echo "🎉 Containers are up and running! 🌟"
+  echo "🎉 Containers are up and running for profile: $API_PROFILE! 🌟"
   echo "🌐 Visit your application to check if everything is working as expected!"
 else
-  echo "❌ Failed to start containers. Please troubleshoot. 🛠️"
+  echo "❌ Failed to start containers for profile: $API_PROFILE. Please troubleshoot. 🛠️"
   exit 1
 fi
 
-echo "✨ Deployment completed successfully! 🎉 Have a great day! 😊"
+echo "✨ Deployment completed successfully for profile: $API_PROFILE! 🎉"
