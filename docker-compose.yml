@@ -35,7 +35,6 @@ services:
             - RABBITMQ_PASS=$RABBITMQ_PASS
         volumes:
             - .:/app
-            - ./logs:/app/logs
         networks:
             - alphaedge__network
         deploy:

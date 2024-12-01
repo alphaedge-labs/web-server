@@ -49,9 +49,6 @@ RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Create logs directory with appropriate permissions
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
-
 # Expose port
 EXPOSE 8000
 

@@ -25,7 +25,7 @@ logger.add(
     colorize=True
 )
 logger.add(
-    "logs/app.log",  # File path for logging
+    "./app.log",  # File path for logging
     rotation="500 MB",  # Rotate when file reaches 500MB
     retention="10 days",  # Keep logs for 10 days
     compression="zip",  # Compress rotated logs
