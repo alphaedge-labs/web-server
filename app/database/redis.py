@@ -40,6 +40,11 @@ class RedisClient:
                 sleep(retries * 0.5)
         raise Exception("Too many retries.")
 
+    def publish(self, channel: str, message: str):
+        """Publish a message to a channel"""
+        self.client.publish(channel, message)
+        logger.info(f"Published message to channel: {channel}")
+
     def _publish_event(self, category, action, data):
         """Helper method to publish events"""
         event = {
@@ -50,10 +55,12 @@ class RedisClient:
         self.publish(category, json.dumps(event))
 
     def _generate_key(self, category, *args):
+        """Generate a key for a category and identifier"""
         return f"{self.prefix}:{category}:{':'.join(map(str, args))}"
 
     # Set or update a hash
     def set_hash(self, category, identifier, data):
+        """Set or update a hash"""
         key = self._generate_key(category, identifier)
         self.client.hset(key, mapping=data)
         logger.info(f"Set hash for key: {key}")
@@ -65,6 +72,7 @@ class RedisClient:
 
     # Get a hash
     def get_hash(self, category, identifier):
+        """Get a hash"""
         key = self._generate_key(category, identifier)
         data = self.client.hgetall(key)
         logger.info(f"Retrieved hash for key: {key}")
@@ -72,6 +80,7 @@ class RedisClient:
 
     # Update specific fields in a hash
     def update_hash(self, category, identifier, updates):
+        """Update specific fields in a hash"""
         key = self._generate_key(category, identifier)
         self.client.hset(key, mapping=updates)
         logger.info(f"Updated hash for key: {key}")
@@ -83,6 +92,7 @@ class RedisClient:
 
     # Delete a hash
     def delete_hash(self, category, identifier):
+        """Delete a hash"""
         key = self._generate_key(category, identifier)
         # Get the data before deleting
         data = self.get_hash(category, identifier)
@@ -96,6 +106,7 @@ class RedisClient:
 
     # Get all keys in a category
     def get_all_keys(self, category):
+        """Get all keys in a category"""
         pattern = self._generate_key(category, "*")
         keys = self.client.keys(pattern)
         logger.info(f"Retrieved keys for pattern: {pattern}")
@@ -103,6 +114,7 @@ class RedisClient:
 
     # Increment a field in a hash (e.g., quantity)
     def increment_hash_field(self, category, identifier, field, amount=1):
+        """Increment a field in a hash"""
         key = self._generate_key(category, identifier)
         new_value = self.client.hincrbyfloat(key, field, amount)
         logger.info(f"Incremented {field} by {amount} for key: {key}")
@@ -111,11 +123,6 @@ class RedisClient:
             "identifier": identifier,
             field: new_value
         })
-
-    def publish(self, channel: str, message: str):
-        """Publish a message to a channel"""
-        self.client.publish(channel, message)
-        logger.info(f"Published message to channel: {channel}")
 
     def get_pubsub(self):
         """Get a pubsub instance"""

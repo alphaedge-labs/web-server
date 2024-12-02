@@ -7,7 +7,7 @@ from app.services.websocket import manager
 class RealtimeService:
     def __init__(self):
         self.pubsub = redis_client.get_pubsub()
-        self.channels = ["orders", "positions", "trades"]
+        self.channels = ["orders", "positions", "trades", "signals"]
         self.running = False
 
     async def start_listening(self):
@@ -23,7 +23,10 @@ class RealtimeService:
                 if message and message['type'] == 'message':
                     channel = message['channel'].decode('utf-8')
                     data = json.loads(message['data'].decode('utf-8'))
-                    
+
+                    # Log the message
+                    logger.info(f"Received event from channel '{channel}': {data}")
+
                     # Format the message for broadcasting
                     broadcast_message = json.dumps({
                         "type": channel,
