@@ -1,7 +1,6 @@
 import redis
 from time import sleep
 from loguru import logger
-import logging
 from app.config import (
     REDIS_HOST,
     REDIS_PORT,
@@ -56,27 +55,22 @@ class RedisClient:
 
     def _generate_key(self, category, *args):
         """Generate a key for a category and identifier"""
-        return f"{self.prefix}:{category}:{':'.join(map(str, args))}"
+        return category if not args else f"{category}:{':'.join(map(str, args))}"
 
     # Set or update a hash
-    def set_hash(self, category, identifier, data):
+    def set_hash(self, category, key, data):
         """Set or update a hash"""
-        key = self._generate_key(category, identifier)
-        self.client.hset(key, mapping=data)
-        logger.info(f"Set hash for key: {key}")
-        # Publish event
-        self._publish_event(category, "create", {
-            "identifier": identifier,
-            **data
-        })
+        if not key:
+            key = self._generate_key(category, key)
+        self.client.hset(category, key, json.dumps(data))
 
     # Get a hash
-    def get_hash(self, category, identifier):
+    def get_hash(self, category, key):
         """Get a hash"""
-        key = self._generate_key(category, identifier)
-        data = self.client.hgetall(key)
-        logger.info(f"Retrieved hash for key: {key}")
-        return {k.decode('utf-8'): v.decode('utf-8') for k, v in data.items()}
+        if not key:
+            key = self._generate_key(category, key)
+        data = self.client.hget(category, key)
+        return json.loads(data) if data else None
 
     # Update specific fields in a hash
     def update_hash(self, category, identifier, updates):
@@ -104,13 +98,10 @@ class RedisClient:
             **data
         })
 
-    # Get all keys in a category
-    def get_all_keys(self, category):
-        """Get all keys in a category"""
-        pattern = self._generate_key(category, "*")
-        keys = self.client.keys(pattern)
-        logger.info(f"Retrieved keys for pattern: {pattern}")
-        return [key.decode('utf-8') for key in keys]
+    def get_all_hashes(self, category):
+        """Get all hashes in a category"""
+        data = self.client.hgetall(category)
+        return [json.loads(value) for value in data.values()]
 
     # Increment a field in a hash (e.g., quantity)
     def increment_hash_field(self, category, identifier, field, amount=1):

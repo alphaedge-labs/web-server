@@ -10,6 +10,16 @@ class RealtimeService:
         self.channels = ["orders", "positions", "trades", "signals"]
         self.running = False
 
+    def get_position_stats(self):
+        positions = redis_client.get_all_hashes("positions")
+        print(positions)
+        stats = {
+            "total_positions": len(positions),
+            "total_pnl": sum(round(float(position["unrealized_pnl"]), 2) for position in positions)
+        }
+        redis_client.set_hash("stats", "web", stats)
+        return stats
+
     async def start_listening(self):
         """Start listening to Redis channels"""
         self.running = True
@@ -27,16 +37,26 @@ class RealtimeService:
                     # Log the message
                     logger.info(f"Received event from channel '{channel}': {data}")
 
-                    # Format the message for broadcasting
-                    broadcast_message = json.dumps({
-                        "type": channel,
-                        "action": data["action"],
-                        "category": data["category"],
-                        "data": data["data"]
-                    })
-                    
-                    logger.info(f"Broadcasting {data['action']} event for {channel}")
-                    await manager.broadcast(broadcast_message)
+                    if channel == "positions":
+                        stats = self.get_position_stats()
+                        broadcast_message = json.dumps({
+                            "type": channel,
+                            "action": data["action"],
+                            "data": stats
+                        })
+                        await manager.broadcast(broadcast_message)
+
+                    if channel == "signals":
+                        # Format the message for broadcasting
+                        broadcast_message = json.dumps({
+                            "type": channel,
+                            "action": data["action"],
+                            "category": data["category"],
+                            "data": data["data"]
+                        })
+                        
+                        logger.info(f"Broadcasting {data['action']} event for {channel}")
+                        await manager.broadcast(broadcast_message)
                     
             except Exception as e:
                 logger.error(f"Error processing message: {str(e)}")

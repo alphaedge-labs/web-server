@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.websockets import WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
 from loguru import logger
 from contextlib import asynccontextmanager
 import logging
@@ -64,6 +66,17 @@ async def lifespan(app: FastAPI):
     await realtime_service.stop_listening()
 
 app = FastAPI(lifespan=lifespan, debug=True)
+
+# Add CORS middleware
+origins = ["http://localhost:5173", "alphaedge.vatsalpandya.com"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(orders_router, prefix="/api/v1/orders", tags=["orders"])

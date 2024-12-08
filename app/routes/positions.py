@@ -1,36 +1,77 @@
 from fastapi import APIRouter
+from datetime import datetime
+from app.database.mongodb import db
+from typing import List
+from pydantic import BaseModel
+from datetime import timedelta
+from app.utils.datetime import get_current_time
 from app.database.redis import redis_client
-
 router = APIRouter()
 
-@router.get("/")
-async def get_positions():
-    """
-    Get all positions from redis
-    """
-    position_keys = redis_client.get_all_keys("positions")
-    positions = []
-    for key in position_keys:
-        # Extract position ID from the key (alphaedge:positions:ID)
-        position_id = key.split(":")[-1]
-        position = redis_client.get_hash("positions", position_id)
-        if position:
-            positions.append({"id": position_id, **position})
-    return positions
+class PositionResponse(BaseModel):
+    date: str
+    symbol: str
+    tradeId: str
+    quantity: int
+    price: str
+    executionDateTime: datetime
+    totalCost: float
+    pl: str
 
-@router.get("/{position_id}")
-async def get_position(position_id: str):
+@router.get("/latest", response_model=List[dict])
+async def get_latest_positions():
     """
-    Get a specific position by ID from redis
+    Get latest positions sorted by date, grouped by exit day
     """
-    position = redis_client.get_hash("positions", position_id)
-    if not position:
-        return {"error": "Position not found"}
-    return {"id": position_id, **position}
+    one_week_ago = (get_current_time() - timedelta(days=7)).replace(tzinfo=None)
+    # Fetch from MongoDB with date filter
+    positions = list(db.closed_positions.find({
+        "exit_time": {"$gt": one_week_ago}
+    }).sort("exit_time", -1))
 
-@router.get("/status")
-async def positions_status():
+    grouped_positions = {}
+
+    for position in positions:
+        # Calculate total cost
+        total_cost = float(position["quantity"]) * float(position["entry_price"])
+        realized_pnl = round(float(position["realized_pnl"]), 2)
+        
+        # Format the position data
+        formatted_position = {
+            "symbol": position["symbol"],
+            "tradeId": position["position_id"],
+            "quantity": int(position["quantity"]),
+            "price": f"{float(position['entry_price']):.2f}",
+            "executionDateTime": position["exit_time"],
+            "totalCost": round(total_cost, 2),
+            "pl": realized_pnl
+        }
+
+        # Group by date
+        date_key = datetime.fromisoformat(str(position["exit_time"])).strftime("%B %d, %Y")
+        if date_key not in grouped_positions:
+            grouped_positions[date_key] = {
+                "date": date_key,
+                "trades": [],
+                "pnl": 0.0
+            }
+        
+        grouped_positions[date_key]["trades"].append(formatted_position)
+        grouped_positions[date_key]["pnl"] += realized_pnl
+
+    # Convert grouped data to a list
+    response = list(grouped_positions.values())
+    return response
+
+@router.get("/stats")
+async def get_positions_stats():
     """
-    Check positions endpoint health
+    Get positions stats
     """
-    return {"status": "healthy"}
+    stats = redis_client.get_hash("stats", "web")
+    if not stats:
+        stats = {
+            "total_positions": 0,
+            "total_pnl": 0.0
+        }
+    return stats
