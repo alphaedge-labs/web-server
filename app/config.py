@@ -13,9 +13,6 @@ REDIS_HOST = os.getenv('REDIS_HOST')
 REDIS_PORT = os.getenv('REDIS_PORT')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 
-# local database
-DATABASE_URL = os.getenv('DATABASE_URL')
-
 # mongo connection string
 MONGO_CONNECTION_STRING = os.getenv('MONGO_CONNECTION_STRING')
 MONGO_DB_NAME = os.getenv('MONGO_DB_NAME')
