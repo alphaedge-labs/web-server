@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from datetime import datetime
 from app.database.mongodb import db
 from typing import List
@@ -75,3 +75,136 @@ async def get_positions_stats():
             "total_pnl": 0.0
         }
     return stats
+
+@router.get("/performance")
+async def get_performance_stats(
+    user_id: str = Query(..., description="User ID"),
+    from_date: datetime = Query(default=None, description="Start date"),
+    to_date: datetime = Query(default=None, description="End date")
+):
+    """
+    Get detailed performance statistics for a user within a date range
+    """
+
+    if from_date is None:
+        from_date = get_current_time().replace(hour=0, minute=0, second=0, microsecond=0)
+    if to_date is None:
+        to_date = from_date + timedelta(days=1)
+
+    pipeline = [
+        {
+            "$match": {
+                "user_id": user_id,
+                "timestamp": {
+                    "$gte": from_date,
+                    "$lt": to_date
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "trade_result": {
+                    "$cond": [
+                        {"$gt": ["$unrealized_pnl", 0]},
+                        "win",
+                        "loss"
+                    ]
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$trade_result",
+                "count": {"$sum": 1},
+                "max_pnl": {"$max": "$unrealized_pnl"},
+                "total_pnl": {"$sum": "$unrealized_pnl"}
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "winning_trades": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$_id", "win"]}, "$count", 0]
+                    }
+                },
+                "losing_trades": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$_id", "loss"]}, "$count", 0]
+                    }
+                },
+                "max_win": {
+                    "$max": {
+                        "$cond": [{"$eq": ["$_id", "win"]}, "$max_pnl", None]
+                    }
+                },
+                "max_loss": {
+                    "$min": {
+                        "$cond": [{"$eq": ["$_id", "loss"]}, "$max_pnl", None]
+                    }
+                },
+                "total_win": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$_id", "win"]}, "$total_pnl", 0]
+                    }
+                },
+                "total_loss": {
+                    "$sum": {
+                        "$cond": [{"$eq": ["$_id", "loss"]}, "$total_pnl", 0]
+                    }
+                },
+                "total_pnl": {"$sum": "$total_pnl"}
+            }
+        },
+        {
+            "$addFields": {
+                "avg_winner": {
+                    "$cond": [
+                        {"$gt": ["$winning_trades", 0]},
+                        {"$round": [{"$divide": ["$total_win", "$winning_trades"]}, 2]},
+                        0
+                    ]
+                },
+                "avg_loser": {
+                    "$cond": [
+                        {"$gt": ["$losing_trades", 0]},
+                        {"$round": [{"$divide": ["$total_loss", "$losing_trades"]}, 2]},
+                        0
+                    ]
+                },
+                "total_win": {"$round": ["$total_win", 2]},
+                "total_loss": {"$round": ["$total_loss", 2]},
+                "total_pnl": {"$round": ["$total_pnl", 2]},
+                "max_win": {"$round": ["$max_win", 2]},
+                "max_loss": {"$round": ["$max_loss", 2]}
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "winning_trades": 1,
+                "losing_trades": 1,
+                "max_win": 1,
+                "max_loss": 1,
+                "total_win": 1,
+                "total_loss": 1,
+                "total_pnl": 1,
+                "avg_winner": 1,
+                "avg_loser": 1
+            }
+        }
+    ]
+
+    result = await db.closed_positions.aggregate(pipeline).to_list(length=1)
+
+    return result[0] if result else {
+        "winning_trades": 0,
+        "losing_trades": 0,
+        "max_win": 0,
+        "max_loss": 0,
+        "total_win": 0,
+        "total_loss": 0,
+        "total_pnl": 0,
+        "avg_winner": 0,
+        "avg_loser": 0
+    }
