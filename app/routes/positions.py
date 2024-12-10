@@ -117,6 +117,7 @@ async def get_performance_stats(
                 "_id": "$trade_result",
                 "count": {"$sum": 1},
                 "max_pnl": {"$max": "$unrealized_pnl"},
+                "min_pnl": {"$min": "$unrealized_pnl"},
                 "total_pnl": {"$sum": "$unrealized_pnl"}
             }
         },
@@ -140,7 +141,7 @@ async def get_performance_stats(
                 },
                 "max_loss": {
                     "$min": {
-                        "$cond": [{"$eq": ["$_id", "loss"]}, "$max_pnl", None]
+                        "$cond": [{"$eq": ["$_id", "loss"]}, "$min_pnl", None]
                     }
                 },
                 "total_win": {
