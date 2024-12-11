@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Query
-from datetime import datetime
-from app.database.mongodb import db
 from typing import List
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from datetime import timedelta
-from app.utils.datetime import get_current_time
+
+from app.database.mongodb import db
 from app.database.redis import redis_client
+from app.utils.datetime import get_current_time
+from pytz import timezone
+
 router = APIRouter()
 
 class PositionResponse(BaseModel):
@@ -32,6 +35,10 @@ async def get_latest_positions():
     grouped_positions = {}
 
     for position in positions:
+        # Convert executionDateTime to IST
+        ist = timezone('Asia/Kolkata')
+        execution_datetime_ist = datetime.fromisoformat(str(position["exit_time"])).astimezone(ist)
+
         # Calculate total cost
         total_cost = float(position["quantity"]) * float(position["entry_price"])
         realized_pnl = round(float(position["realized_pnl"]), 2)
@@ -41,14 +48,18 @@ async def get_latest_positions():
             "symbol": position["symbol"],
             "tradeId": position["position_id"],
             "quantity": int(position["quantity"]),
-            "price": f"{float(position['entry_price']):.2f}",
-            "executionDateTime": position["exit_time"],
+            "entry_price": f"{float(position['entry_price']):.2f}",
+            "exit_price": f"{float(position['current_price']):.2f}",
+            "executionDateTime": execution_datetime_ist,
             "totalCost": round(total_cost, 2),
-            "pl": realized_pnl
+            "pl": realized_pnl,
+            "used_margin": round(position.get("blocked_capital", 0), 2),
+            # TODO: This is hardcoded for now but can be improved later
+            "identifier": f"Nifty50 {position['strike_price']} {position['right']} {position['expiry_date']}"
         }
 
         # Group by date
-        date_key = datetime.fromisoformat(str(position["exit_time"])).strftime("%B %d, %Y")
+        date_key = execution_datetime_ist.strftime("%B %d, %Y")
         if date_key not in grouped_positions:
             grouped_positions[date_key] = {
                 "date": date_key,
@@ -177,7 +188,23 @@ async def get_performance_stats(
                 "total_loss": {"$round": ["$total_loss", 2]},
                 "total_pnl": {"$round": ["$total_pnl", 2]},
                 "max_win": {"$round": ["$max_win", 2]},
-                "max_loss": {"$round": ["$max_loss", 2]}
+                "max_loss": {"$round": ["$max_loss", 2]},
+                "hit_rate": {
+                    "$cond": [
+                        {"$gt": [{"$add": ["$winning_trades", "$losing_trades"]}, 0]},
+                        {"$round": [
+                            {"$multiply": [
+                                {"$divide": [
+                                    "$winning_trades",
+                                    {"$add": ["$winning_trades", "$losing_trades"]}
+                                ]},
+                                100
+                            ]},
+                            2
+                        ]},
+                        0
+                    ]
+                }
             }
         },
         {
@@ -191,7 +218,8 @@ async def get_performance_stats(
                 "total_loss": 1,
                 "total_pnl": 1,
                 "avg_winner": 1,
-                "avg_loser": 1
+                "avg_loser": 1,
+                "hit_rate": 1
             }
         }
     ]
@@ -207,5 +235,6 @@ async def get_performance_stats(
         "total_loss": 0,
         "total_pnl": 0,
         "avg_winner": 0,
-        "avg_loser": 0
+        "avg_loser": 0,
+        "hit_rate": 0
     }
