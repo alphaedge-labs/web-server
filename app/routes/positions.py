@@ -37,7 +37,7 @@ async def get_latest_positions():
     for position in positions:
         # Convert executionDateTime to IST
         ist = timezone('Asia/Kolkata')
-        execution_datetime_ist = datetime.fromisoformat(str(position["exit_time"])).astimezone(ist)
+        execution_datetime_ist = position["exit_time"].replace(tzinfo=timezone('UTC')).astimezone(ist)
 
         # Calculate total cost
         total_cost = float(position["quantity"]) * float(position["entry_price"])
