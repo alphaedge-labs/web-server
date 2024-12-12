@@ -224,7 +224,7 @@ async def get_performance_stats(
         }
     ]
 
-    result = await db.closed_positions.aggregate(pipeline).to_list(length=1)
+    result = list(db.closed_positions.aggregate(pipeline))
 
     return result[0] if result else {
         "winning_trades": 0,
