@@ -89,7 +89,7 @@ async def get_positions_stats():
 
 @router.get("/performance")
 async def get_performance_stats(
-    user_id: str = Query(..., description="User ID"),
+    user_id: str = Query(default=None, description="User ID"),
     from_date: datetime = Query(default=None, description="Start date"),
     to_date: datetime = Query(default=None, description="End date")
 ):
@@ -102,15 +102,19 @@ async def get_performance_stats(
     if to_date is None:
         to_date = from_date + timedelta(days=1)
 
+    match_pipeline = {
+        "timestamp": {
+            "$gte": from_date,
+            "$lt": to_date
+        }
+    }
+
+    if user_id:
+        match_pipeline["user_id"] = user_id
+
     pipeline = [
         {
-            "$match": {
-                "user_id": user_id,
-                "timestamp": {
-                    "$gte": from_date,
-                    "$lt": to_date
-                }
-            }
+            "$match": match_pipeline
         },
         {
             "$addFields": {
